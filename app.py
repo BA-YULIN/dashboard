@@ -72,10 +72,16 @@ cluster_stats = clustering_results.groupby('cluster').agg({
 cluster_stats.columns = ['Cluster', 'Avg_Income', 'Avg_Wines', 'Avg_Meat', 'Avg_Recency', 'Avg_Kids', 'Size']
 cluster_stats['Total_Spending'] = cluster_stats['Avg_Wines'] + cluster_stats['Avg_Meat']
 
-cluster_labels = {
+# Cluster labels derived from CSV data analysis:
+# Cluster 0: Avg Income $35,180, has kids (1.0) → Low-Income Family
+# Cluster 1: Avg Income $72,723, high spending, no kids → High-Spending Elite  
+# Cluster 2: Avg Income $57,106, medium spending → Middle-Class Stable
+# Cluster 3: Avg Income $81,183, highest spending → Premium VIP
+cluster_labels = {c: f'Cluster {c}' for c in clustering_results['cluster'].unique()}
+cluster_labels.update({
     0: 'Low-Income Family', 1: 'High-Spending Elite',
     2: 'Middle-Class Stable', 3: 'Premium VIP'
-}
+})
 
 # ============================================================================
 # APP INITIALIZATION WITH CUSTOM CSS
@@ -648,9 +654,17 @@ def page_2_layout():
 def page_3_layout():
     colors_cluster = ['#6366f1', '#ec4899', '#10b981', '#f59e0b']
     
-    fig_pca = px.scatter(clustering_results, x='pca1', y='pca2', color='cluster',
-                         labels={'pca1': 'PC1', 'pca2': 'PC2', 'cluster': 'Segment'},
-                         color_continuous_scale=[[0, '#6366f1'], [0.33, '#ec4899'], [0.66, '#10b981'], [1, '#f59e0b']],
+    # Convert cluster to string for discrete coloring
+    cluster_plot_data = clustering_results.copy()
+    cluster_plot_data['cluster_str'] = cluster_plot_data['cluster'].astype(str)
+    
+    # Dynamic color mapping based on actual clusters in CSV
+    unique_clusters = sorted(clustering_results['cluster'].unique())
+    cluster_color_map = {str(c): colors_cluster[i % len(colors_cluster)] for i, c in enumerate(unique_clusters)}
+    
+    fig_pca = px.scatter(cluster_plot_data, x='pca1', y='pca2', color='cluster_str',
+                         labels={'pca1': 'PC1', 'pca2': 'PC2', 'cluster_str': 'Segment'},
+                         color_discrete_map=cluster_color_map,
                          hover_data=['Income', 'MntWines', 'Recency'])
     fig_pca.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=380,
@@ -759,7 +773,7 @@ def page_4_layout():
     top_rules = association_rules.nlargest(10, 'lift')[['antecedents', 'consequents', 'support', 'confidence', 'lift']]
     top_rules = top_rules.round(4)
     
-    top_lift = association_rules.nlargest(8, 'lift')
+    top_lift = association_rules.nlargest(8, 'lift').copy()
     top_lift['Rule'] = top_lift['antecedents'] + ' → ' + top_lift['consequents']
     
     fig_lift = go.Figure(go.Bar(
@@ -820,13 +834,13 @@ def page_4_layout():
                         html.Div([
                             html.P([html.I(className="fas fa-arrow-right", style={"color": "#6366f1", "marginRight": "8px", "fontSize": "12px"}), 
                                    f"{top_lift.iloc[0]['antecedents']} → {top_lift.iloc[0]['consequents']} (Lift: {top_lift.iloc[0]['lift']:.2f})"], 
-                                   style={"color": "#475569", "marginBottom": "8px", "fontSize": "13px"}),
+                                   style={"color": "#475569", "marginBottom": "8px", "fontSize": "13px"}) if len(top_lift) > 0 else None,
                             html.P([html.I(className="fas fa-arrow-right", style={"color": "#6366f1", "marginRight": "8px", "fontSize": "12px"}),
                                    f"{top_lift.iloc[1]['antecedents']} → {top_lift.iloc[1]['consequents']} (Lift: {top_lift.iloc[1]['lift']:.2f})"], 
-                                   style={"color": "#475569", "marginBottom": "8px", "fontSize": "13px"}),
+                                   style={"color": "#475569", "marginBottom": "8px", "fontSize": "13px"}) if len(top_lift) > 1 else None,
                             html.P([html.I(className="fas fa-arrow-right", style={"color": "#6366f1", "marginRight": "8px", "fontSize": "12px"}),
                                    f"{top_lift.iloc[2]['antecedents']} → {top_lift.iloc[2]['consequents']} (Lift: {top_lift.iloc[2]['lift']:.2f})"], 
-                                   style={"color": "#475569", "marginBottom": "0", "fontSize": "13px"}),
+                                   style={"color": "#475569", "marginBottom": "0", "fontSize": "13px"}) if len(top_lift) > 2 else None,
                         ])
                     ], className="alert-premium", style={"marginTop": "16px"})
                 ], icon="fa-project-diagram")
@@ -918,7 +932,7 @@ def page_5_layout():
                         html.Button([
                             html.I(className="fas fa-magic", style={"marginRight": "10px"}),
                             "Generate Prediction"
-                        ], id='predict-btn', className="btn-premium", style={"width": "100%", "cursor": "pointer"})
+                        ], id='predict-btn', n_clicks=0, className="btn-premium", style={"width": "100%", "cursor": "pointer"})
                     ])
                 ], icon="fa-user-edit")
             ], lg=4, md=12, className="mb-4"),
@@ -931,8 +945,8 @@ def page_5_layout():
                             html.Div([
                                 html.I(className="fas fa-percentage", style={"color": "#6366f1", "fontSize": "20px", "marginBottom": "8px"}),
                                 html.Div("Response Probability", style={"fontSize": "12px", "color": "#64748b", "textTransform": "uppercase", "marginBottom": "8px"}),
-                                html.Div(id='output-probability', style={"fontSize": "36px", "fontWeight": "800", "color": "#1e293b"}),
-                                dcc.Graph(id='probability-gauge', style={"height": "120px"}, config={'displayModeBar': False})
+                                html.Div(id='output-probability', children="--", style={"fontSize": "36px", "fontWeight": "800", "color": "#1e293b"}),
+                                dcc.Graph(id='probability-gauge', figure=go.Figure().update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=100, margin=dict(l=0,r=0,t=0,b=0)), style={"height": "120px"}, config={'displayModeBar': False})
                             ], style={"textAlign": "center"})
                         ], className="kpi-card kpi-card-purple", style={"height": "100%"})
                     ], lg=4, className="mb-4"),
@@ -941,8 +955,8 @@ def page_5_layout():
                             html.Div([
                                 html.I(className="fas fa-user-tag", style={"color": "#10b981", "fontSize": "20px", "marginBottom": "8px"}),
                                 html.Div("Predicted Segment", style={"fontSize": "12px", "color": "#64748b", "textTransform": "uppercase", "marginBottom": "8px"}),
-                                html.Div(id='output-segment', style={"fontSize": "24px", "fontWeight": "700", "color": "#10b981", "marginBottom": "8px"}),
-                                html.Div(id='output-segment-desc', style={"fontSize": "13px", "color": "#64748b"})
+                                html.Div(id='output-segment', children="--", style={"fontSize": "24px", "fontWeight": "700", "color": "#10b981", "marginBottom": "8px"}),
+                                html.Div(id='output-segment-desc', children="Click predict to analyze", style={"fontSize": "13px", "color": "#64748b"})
                             ], style={"textAlign": "center"})
                         ], className="kpi-card kpi-card-green", style={"height": "100%"})
                     ], lg=4, className="mb-4"),
@@ -951,15 +965,15 @@ def page_5_layout():
                             html.Div([
                                 html.I(className="fas fa-bullhorn", style={"color": "#f59e0b", "fontSize": "20px", "marginBottom": "8px"}),
                                 html.Div("Strategy", style={"fontSize": "12px", "color": "#64748b", "textTransform": "uppercase", "marginBottom": "8px"}),
-                                html.Div(id='output-strategy', style={"fontSize": "20px", "fontWeight": "700", "color": "#f59e0b", "marginBottom": "8px"}),
-                                html.Div(id='output-strategy-desc', style={"fontSize": "12px", "color": "#64748b", "lineHeight": "1.5"})
+                                html.Div(id='output-strategy', children="--", style={"fontSize": "20px", "fontWeight": "700", "color": "#f59e0b", "marginBottom": "8px"}),
+                                html.Div(id='output-strategy-desc', children="Click predict button", style={"fontSize": "12px", "color": "#64748b", "lineHeight": "1.5"})
                             ], style={"textAlign": "center"})
                         ], className="kpi-card kpi-card-orange", style={"height": "100%"})
                     ], lg=4, className="mb-4"),
                 ]),
                 
                 create_glass_card("Customer vs Population Comparison", [
-                    dcc.Graph(id='customer-profile-chart', style={"height": "280px"}, config={'displayModeBar': False})
+                    dcc.Graph(id='customer-profile-chart', figure=go.Figure().update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=250, margin=dict(l=50,r=30,t=30,b=50), annotations=[dict(text='Click "Generate Prediction" to see comparison', x=0.5, y=0.5, xref='paper', yref='paper', showarrow=False, font=dict(size=14, color='#94a3b8'))]), style={"height": "280px"}, config={'displayModeBar': False})
                 ], icon="fa-chart-bar")
             ], lg=8, md=12),
         ])
@@ -1049,6 +1063,7 @@ def update_page1_charts(age_filter, education_filter, campaign_filter, marital_f
      Input('recency-range', 'value')]
 )
 def update_cluster_chart(cluster_filter, income_range, recency_range):
+    colors_cluster = ['#6366f1', '#ec4899', '#10b981', '#f59e0b']
     filtered = clustering_results.copy()
     
     if cluster_filter != 'All':
@@ -1057,9 +1072,17 @@ def update_cluster_chart(cluster_filter, income_range, recency_range):
     filtered = filtered[(filtered['Income'] >= income_range[0]) & (filtered['Income'] <= income_range[1])]
     filtered = filtered[(filtered['Recency'] >= recency_range[0]) & (filtered['Recency'] <= recency_range[1])]
     
-    fig = px.scatter(filtered, x='pca1', y='pca2', color='cluster',
-                     labels={'pca1': 'PC1', 'pca2': 'PC2', 'cluster': 'Segment'},
-                     color_continuous_scale=[[0, '#6366f1'], [0.33, '#ec4899'], [0.66, '#10b981'], [1, '#f59e0b']],
+    # Convert cluster to string for discrete coloring (use .loc to avoid SettingWithCopyWarning)
+    filtered = filtered.copy()
+    filtered['cluster_str'] = filtered['cluster'].astype(str)
+    
+    # Dynamic color mapping based on actual clusters in CSV
+    unique_clusters = sorted(clustering_results['cluster'].unique())
+    cluster_color_map = {str(c): colors_cluster[i % len(colors_cluster)] for i, c in enumerate(unique_clusters)}
+    
+    fig = px.scatter(filtered, x='pca1', y='pca2', color='cluster_str',
+                     labels={'pca1': 'PC1', 'pca2': 'PC2', 'cluster_str': 'Segment'},
+                     color_discrete_map=cluster_color_map,
                      hover_data=['Income', 'MntWines', 'Recency'])
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350,
@@ -1084,9 +1107,15 @@ def update_cluster_chart(cluster_filter, income_range, recency_range):
     [State('input-age', 'value'),
      State('input-income', 'value'),
      State('input-spending', 'value'),
-     State('input-recency', 'value')]
+     State('input-recency', 'value')],
+    prevent_initial_call=True
 )
 def predict_customer(n_clicks, age, income, spending, recency):
+    # Validate inputs
+    if age is None or income is None or spending is None or recency is None:
+        empty_fig = go.Figure()
+        empty_fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=100)
+        return "--", "--", "Enter values", "--", "Click predict", empty_fig, empty_fig
     # =========================================================================
     # 1. PREDICTED SEGMENT - Using K-Means from clustering_results.csv
     # =========================================================================
@@ -1099,9 +1128,9 @@ def predict_customer(n_clicks, age, income, spending, recency):
     }).reset_index()
     
     # Find nearest cluster based on Euclidean distance (normalized)
-    income_max = clustering_results['Income'].max()
-    spending_max = (clustering_results['MntWines'] + clustering_results['MntMeatProducts']).max()
-    recency_max = clustering_results['Recency'].max()
+    income_max = clustering_results['Income'].max() or 1  # Prevent division by zero
+    spending_max = (clustering_results['MntWines'] + clustering_results['MntMeatProducts']).max() or 1
+    recency_max = clustering_results['Recency'].max() or 1
     
     min_dist = float('inf')
     predicted_cluster = 0
@@ -1118,32 +1147,46 @@ def predict_customer(n_clicks, age, income, spending, recency):
     
     # Map cluster to segment name from cluster_labels (defined from CSV analysis)
     segment = cluster_labels.get(predicted_cluster, f"Cluster {predicted_cluster}")
-    segment_descriptions = {
-        0: f"Cluster 0: Avg Income ${cluster_stats[cluster_stats['Cluster']==0]['Avg_Income'].values[0]:,.0f}",
-        1: f"Cluster 1: Avg Income ${cluster_stats[cluster_stats['Cluster']==1]['Avg_Income'].values[0]:,.0f}",
-        2: f"Cluster 2: Avg Income ${cluster_stats[cluster_stats['Cluster']==2]['Avg_Income'].values[0]:,.0f}",
-        3: f"Cluster 3: Avg Income ${cluster_stats[cluster_stats['Cluster']==3]['Avg_Income'].values[0]:,.0f}"
-    }
-    segment_desc = segment_descriptions.get(predicted_cluster, "")
+    
+    # Safely get cluster avg income with fallback
+    def get_cluster_avg_income(cluster_id):
+        subset = cluster_stats[cluster_stats['Cluster'] == cluster_id]
+        if len(subset) > 0:
+            return f"Cluster {cluster_id}: Avg Income ${subset['Avg_Income'].values[0]:,.0f}"
+        return f"Cluster {cluster_id}"
+    
+    segment_desc = get_cluster_avg_income(predicted_cluster)
     
     # =========================================================================
-    # 2. PREDICTED RESPONSE PROBABILITY - Based on best model from CSV
+    # 2. PREDICTED RESPONSE PROBABILITY - Based on cluster analysis from CSV
     # =========================================================================
-    # Best model accuracy from classification_results_all.csv
-    best_accuracy = classification_results['Accuracy'].max()
-    
     # Calculate probability based on cluster response rates from retail_data
     # Merge cluster info with response data
     cluster_data = clustering_results[['ID', 'cluster']].copy()
     retail_with_cluster = retail_data.merge(cluster_data, on='ID', how='left')
     
-    # Get response rate for the predicted cluster
+    # Get response rate for the predicted cluster (handle NaN safely)
+    retail_with_cluster = retail_with_cluster.dropna(subset=['cluster'])  # Remove NaN clusters
     cluster_response_rates = retail_with_cluster.groupby('cluster')['Response'].mean()
-    base_probability = cluster_response_rates.get(predicted_cluster, retail_data['Response'].mean())
     
-    # Adjust probability based on customer features relative to cluster average
-    cluster_avg_income = cluster_centers[cluster_centers['cluster'] == predicted_cluster]['Income'].values[0]
-    cluster_avg_recency = cluster_centers[cluster_centers['cluster'] == predicted_cluster]['Recency'].values[0]
+    # Safely get base probability with fallback
+    if predicted_cluster in cluster_response_rates.index:
+        base_probability = cluster_response_rates[predicted_cluster]
+    else:
+        base_probability = retail_data['Response'].mean()
+    
+    # Ensure base_probability is a valid number
+    if pd.isna(base_probability):
+        base_probability = retail_data['Response'].mean()
+    
+    # Adjust probability based on customer features relative to cluster average (with safety checks)
+    cluster_subset = cluster_centers[cluster_centers['cluster'] == predicted_cluster]
+    if len(cluster_subset) > 0:
+        cluster_avg_income = cluster_subset['Income'].values[0]
+        cluster_avg_recency = cluster_subset['Recency'].values[0]
+    else:
+        cluster_avg_income = clustering_results['Income'].mean()
+        cluster_avg_recency = clustering_results['Recency'].mean()
     
     income_factor = 1.0 + 0.2 * ((income - cluster_avg_income) / cluster_avg_income) if cluster_avg_income > 0 else 1.0
     recency_factor = 1.0 + 0.1 * ((cluster_avg_recency - recency) / cluster_avg_recency) if cluster_avg_recency > 0 else 1.0
