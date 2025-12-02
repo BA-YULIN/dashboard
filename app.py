@@ -62,8 +62,8 @@ bank_subset.columns = ['Age', 'Education', 'Marital_Status', 'Response', 'Campai
 retail_subset = retail_data[['Age', 'Education', 'Marital_Status', 'Response', 'Campaign_Type', 'Age_Group']].copy()
 combined_data = pd.concat([bank_subset, retail_subset], ignore_index=True)
 
-association_rules['antecedents'] = association_rules['antecedents'].str.replace("frozenset\\({'|'}\\)", '', regex=True)
-association_rules['consequents'] = association_rules['consequents'].str.replace("frozenset\\({'|'}\\)", '', regex=True)
+association_rules['antecedents'] = association_rules['antecedents'].str.replace(r"frozenset\(\{|\}\)", '', regex=True).str.replace("'", "")
+association_rules['consequents'] = association_rules['consequents'].str.replace(r"frozenset\(\{|\}\)", '', regex=True).str.replace("'", "")
 
 cluster_stats = clustering_results.groupby('cluster').agg({
     'Income': 'mean', 'MntWines': 'mean', 'MntMeatProducts': 'mean',
@@ -815,7 +815,6 @@ def page_4_layout():
                     html.Div([
                         html.Div([
                             html.I(className="fas fa-lightbulb", style={"color": "#f59e0b", "marginRight": "10px"}),
-<<<<<<< HEAD
                             html.Span("Top 3 Rules", style={"color": "#1e293b", "fontWeight": "600"})
                         ], style={"marginBottom": "12px"}),
                         html.Div([
@@ -828,17 +827,6 @@ def page_4_layout():
                             html.P([html.I(className="fas fa-arrow-right", style={"color": "#6366f1", "marginRight": "8px", "fontSize": "12px"}),
                                    f"{top_lift.iloc[2]['antecedents']} → {top_lift.iloc[2]['consequents']} (Lift: {top_lift.iloc[2]['lift']:.2f})"], 
                                    style={"color": "#475569", "marginBottom": "0", "fontSize": "13px"}),
-=======
-                            html.Span("Key Insights", style={"color": "#1e293b", "fontWeight": "600"})
-                        ], style={"marginBottom": "12px"}),
-                        html.Div([
-                            html.P([html.I(className="fas fa-check", style={"color": "#10b981", "marginRight": "8px", "fontSize": "12px"}), 
-                                   "High Income × High Spending → Higher response rate"], style={"color": "#475569", "marginBottom": "8px", "fontSize": "13px"}),
-                            html.P([html.I(className="fas fa-check", style={"color": "#10b981", "marginRight": "8px", "fontSize": "12px"}),
-                                   "Engaged customers are more campaign-sensitive"], style={"color": "#475569", "marginBottom": "8px", "fontSize": "13px"}),
-                            html.P([html.I(className="fas fa-times", style={"color": "#ef4444", "marginRight": "8px", "fontSize": "12px"}),
-                                   "Low spend × Low engagement rarely convert"], style={"color": "#475569", "marginBottom": "0", "fontSize": "13px"}),
->>>>>>> 6d6a84c34882f319c51f08c6a6192ea2b289ee7c
                         ])
                     ], className="alert-premium", style={"marginTop": "16px"})
                 ], icon="fa-project-diagram")
@@ -1099,7 +1087,6 @@ def update_cluster_chart(cluster_filter, income_range, recency_range):
      State('input-recency', 'value')]
 )
 def predict_customer(n_clicks, age, income, spending, recency):
-<<<<<<< HEAD
     # =========================================================================
     # 1. PREDICTED SEGMENT - Using K-Means from clustering_results.csv
     # =========================================================================
@@ -1183,33 +1170,6 @@ def predict_customer(n_clicks, age, income, spending, recency):
     # GAUGE CHART
     # =========================================================================
     gauge_color = '#10b981' if probability >= 0.5 else '#f59e0b' if probability >= 0.3 else '#ef4444'
-=======
-    income_score = min(income / 80000, 1.0) * 0.3
-    spending_score = min(spending / 1500, 1.0) * 0.35
-    recency_score = max(0, (100 - recency) / 100) * 0.25
-    age_score = 0.1 if 30 <= age <= 55 else 0.05
-    
-    probability = min(income_score + spending_score + recency_score + age_score, 0.95)
-    probability = max(probability, 0.05)
-    
-    if income >= 70000 and spending >= 1000:
-        segment, segment_desc = "Premium Elite", "High income, high spending VIP customer"
-    elif income >= 50000 and spending >= 500:
-        segment, segment_desc = "High Value", "Above average income and engagement"
-    elif income < 35000 or spending < 200:
-        segment, segment_desc = "Budget Tier", "Price-sensitive, low engagement"
-    else:
-        segment, segment_desc = "Core Market", "Stable middle-class customer"
-    
-    if probability >= 0.65:
-        strategy, strategy_desc = "High Priority", "Deploy premium campaigns. High conversion potential detected."
-    elif probability >= 0.4:
-        strategy, strategy_desc = "Medium Priority", "Light promotional campaigns recommended. Monitor engagement."
-    else:
-        strategy, strategy_desc = "Low Priority", "Minimal marketing investment suggested at this time."
-    
-    gauge_color = '#10b981' if probability >= 0.65 else '#f59e0b' if probability >= 0.4 else '#ef4444'
->>>>>>> 6d6a84c34882f319c51f08c6a6192ea2b289ee7c
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge",
         value=probability * 100,
@@ -1220,15 +1180,9 @@ def predict_customer(n_clicks, age, income, spending, recency):
             'bgcolor': '#f1f5f9',
             'borderwidth': 0,
             'steps': [
-<<<<<<< HEAD
                 {'range': [0, 30], 'color': 'rgba(239,68,68,0.15)'},
                 {'range': [30, 50], 'color': 'rgba(245,158,11,0.15)'},
                 {'range': [50, 100], 'color': 'rgba(16,185,129,0.15)'}
-=======
-                {'range': [0, 40], 'color': 'rgba(239,68,68,0.15)'},
-                {'range': [40, 65], 'color': 'rgba(245,158,11,0.15)'},
-                {'range': [65, 100], 'color': 'rgba(16,185,129,0.15)'}
->>>>>>> 6d6a84c34882f319c51f08c6a6192ea2b289ee7c
             ]
         }
     ))
@@ -1237,20 +1191,16 @@ def predict_customer(n_clicks, age, income, spending, recency):
         height=100, margin=dict(l=20, r=20, t=20, b=20)
     )
     
-<<<<<<< HEAD
     # =========================================================================
     # 4. COMPARISON CHART - Population averages from marketing_campaign.csv
     # =========================================================================
     # Actual averages from retail_data (marketing_campaign.csv)
-=======
->>>>>>> 6d6a84c34882f319c51f08c6a6192ea2b289ee7c
     avg_income = retail_data['Income'].mean()
     avg_spending = retail_data['Total_Spending'].mean()
     avg_recency = retail_data['Recency'].mean()
     
     fig_profile = go.Figure()
     fig_profile.add_trace(go.Bar(
-<<<<<<< HEAD
         name='This Customer', x=['Income (K$)', 'Spending ($)', 'Recency (days)'],
         y=[income / 1000, spending, recency],
         marker=dict(color='#6366f1', line=dict(width=0)),
@@ -1262,19 +1212,6 @@ def predict_customer(n_clicks, age, income, spending, recency):
         y=[avg_income / 1000, avg_spending, avg_recency],
         marker=dict(color='#cbd5e1', line=dict(width=0)),
         text=[f'{avg_income/1000:.1f}K', f'${avg_spending:.0f}', f'{avg_recency:.0f}d'],
-=======
-        name='This Customer', x=['Income (K$)', 'Spending ($)', 'Recency'],
-        y=[income / 1000, spending, recency],
-        marker=dict(color='#6366f1', line=dict(width=0)),
-        text=[f'{income/1000:.0f}K', f'${spending}', f'{recency}d'],
-        textposition='outside', textfont=dict(color='#334155', size=11)
-    ))
-    fig_profile.add_trace(go.Bar(
-        name='Population Avg', x=['Income (K$)', 'Spending ($)', 'Recency'],
-        y=[avg_income / 1000, avg_spending, avg_recency],
-        marker=dict(color='#cbd5e1', line=dict(width=0)),
-        text=[f'{avg_income/1000:.0f}K', f'${avg_spending:.0f}', f'{avg_recency:.0f}d'],
->>>>>>> 6d6a84c34882f319c51f08c6a6192ea2b289ee7c
         textposition='outside', textfont=dict(color='#94a3b8', size=11)
     ))
     fig_profile.update_layout(
@@ -1293,8 +1230,4 @@ def predict_customer(n_clicks, age, income, spending, recency):
 # ============================================================================
 
 if __name__ == '__main__':
-<<<<<<< HEAD
     app.run(debug=True, host='127.0.0.1', port=8050)
-=======
-    app.run(debug=True, host='0.0.0.0', port=8050)
->>>>>>> 6d6a84c34882f319c51f08c6a6192ea2b289ee7c
